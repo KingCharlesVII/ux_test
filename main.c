@@ -41,12 +41,27 @@ bool    ux_is_supported_type(char *type) {
         } \
     }   while(0) \
 
-#define Ux_assert_eq(type, expression_a, expression_b) do { Ux_static_assert(ux_is_supported_type(#type)) } while (0)
+#define Ux_assert_eq(type, expression_a, expression_b) do { \
+    Ux_static_assert(ux_is_supported_type(#type)) \
+    type left_expression = expression_a; \
+    type right_expression = expression_b; \
+    if (right_expression != left_expression) \
+        abort(); \
+    } while (0) \
+
+#define Ux_expect_eq(type, expression_a, expression_b) do { \
+    Ux_static_assert(ux_is_supported_type(#type)) \
+    type left_expression = expression_a; \
+    type right_expression = expression_b; \
+    if (right_expression != left_expression) \
+        if (ux_test_index >= 1) \
+            tests[ux_test_index - 1].success = false; \
+    } while (0) \
 
 // #define Ux_assert_str_eq()
 
 Ux_test(addition) {
-    printf("Hello");
+    Ux_expect_eq(int, 1, 2);
 }
 
 Ux_test(multiplication) {
@@ -56,6 +71,8 @@ Ux_test(multiplication) {
 void    ux_test_run(void) {
     for(size_t index = 0; index < ux_test_index; index++) {
         tests[index].execute();
+        if (tests[index].success == false)
+            fprintf(stderr, "Error in this test\n");
     }
 }
 
