@@ -4,19 +4,35 @@
 #include <string.h>
 
 typedef char * string;
-typedef void(*ux_test)(void);
+typedef void(*ux_test_routine)(void);
 
-typedef struct ux_test_function{
-    const char *name;
-    ux_test execute;
-    bool    success;
+typedef struct ux_test_info {
+    string  file;
+    string  name;
+    string  line;    
+}   ux_test_info;
+
+typedef struct ux_test_function {
+    string  name;
+    ux_test_routine execute;
 }   ux_test_function;
 
-static ux_test_function tests[256];
+typedef struct ux_test_result {
+    string message;
+    bool    success;
+}   ux_test_result;
+
+typedef struct ux_test{
+    ux_test_function    function;
+    ux_test_info info;
+    ux_test_result      result;
+}   ux_test;
+
+static ux_test test[256];
 static size_t  ux_test_index = 0;
 
-void    ux_test_register(ux_test_function this) {
-    tests[ux_test_index++] = this;
+void    ux_test_register(ux_test this) {
+    test[ux_test_index++] = this;
 }
 
 bool    ux_is_supported_type(char *type) {
@@ -27,7 +43,7 @@ bool    ux_is_supported_type(char *type) {
 
 #define Ux_test(name) \
     static void name(void); \
-    static const ux_test_function test_##name = {#name, name, true}; \
+    static const ux_test test_##name = {(ux_test_function){#name, name}, (ux_test_result){NULL, true}}; \
     static void __register_##name(void) __attribute((constructor)); \
     static void __register_##name(void) {ux_test_register(test_##name);} \
     static void name(void) \
@@ -41,6 +57,7 @@ bool    ux_is_supported_type(char *type) {
         } \
     }   while(0) \
 
+
 #define Ux_assert_eq(type, expression_a, expression_b) do { \
     Ux_static_assert(ux_is_supported_type(#type)) \
     type left_expression = expression_a; \
@@ -53,27 +70,42 @@ bool    ux_is_supported_type(char *type) {
     Ux_static_assert(ux_is_supported_type(#type)) \
     type left_expression = expression_a; \
     type right_expression = expression_b; \
-    if (right_expression != left_expression) \
-        if (ux_test_index >= 1) \
-            tests[ux_test_index - 1].success = false; \
+    if (ux_test_index < 1) \
+        break; \
+    ux_test *current_test = &test[ux_test_index - 1]; \
+    if (left_expression != right_expression) { \
+        current_test->result.success = false; \
+    } \
     } while (0) \
 
-// #define Ux_assert_str_eq()
+void    ux_test_execute(void) {
+     for(size_t index = 0; index < ux_test_index; index++)
+        test[index].function.execute();
+}
+
+void    ux_test_log_error(ux_test the_test) {
+    fprintf(stderr, "File [%s]: in function [%s], line [%s]: %s"
+        , the_test.function.file, the_test.function.name, the_test.function.line
+        , the_test.result.message);
+}
+
+void    ux_test_log(void) {
+     for(size_t index = 0; index < ux_test_index; index++)
+        ux_test_log_error(test[index]);
+}
+
+void    ux_test_run(void) {
+   
+  
+}
 
 Ux_test(addition) {
+    Ux_expect_eq(int, 1, 2);
     Ux_expect_eq(int, 1, 2);
 }
 
 Ux_test(multiplication) {
     printf("World");
-}
-
-void    ux_test_run(void) {
-    for(size_t index = 0; index < ux_test_index; index++) {
-        tests[index].execute();
-        if (tests[index].success == false)
-            fprintf(stderr, "Error in this test\n");
-    }
 }
 
 int main(void) {
